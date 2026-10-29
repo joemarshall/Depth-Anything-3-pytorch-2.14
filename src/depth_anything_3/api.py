@@ -36,7 +36,11 @@ from depth_anything_3.utils.geometry import affine_inverse
 from depth_anything_3.utils.io.input_processor import InputProcessor
 from depth_anything_3.utils.io.output_processor import OutputProcessor
 from depth_anything_3.utils.logger import logger
-from depth_anything_3.utils.pose_align import align_poses_umeyama
+try:
+    from depth_anything_3.utils.pose_align import align_poses_umeyama
+except ImportError:
+    def align_poses_umeyama(*args, **kwargs):
+        raise ImportError("align_poses_umeyama requires optional dependency 'evo'")
 
 torch.backends.cudnn.benchmark = False
 # logger.info("CUDNN Benchmark Disabled")
@@ -122,13 +126,35 @@ class DepthAnything3(nn.Module, PyTorchModelHubMixin):
         Returns:
             Dictionary containing model predictions
         """
-        # Determine optimal autocast dtype
-        autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        autocast_dtype = torch.bfloat16 
         with torch.no_grad():
             with torch.autocast(device_type=image.device.type, dtype=autocast_dtype):
                 return self.model(
                     image, extrinsics, intrinsics, export_feat_layers, infer_gs, use_ray_pose, ref_view_strategy
                 )
+        # with torch.no_grad():
+        #     return self.model(
+        #         image, extrinsics, intrinsics, export_feat_layers, infer_gs, use_ray_pose, ref_view_strategy
+        #     )
+        # # Determine optimal autocast dtype
+        # if torch.is_autocast_enabled("cuda"):
+        #     # don't autocast inside autocast
+        #     # because someone outside us wants to 
+        #     # do their own casting
+        #     # e.g. to send inputs as fp16 / bfloat16 
+        #     # to save memory
+        #     with torch.no_grad(): 
+        #         return self.model(
+        #             image, extrinsics, intrinsics, export_feat_layers, infer_gs, use_ray_pose, ref_view_strategy
+        #         )
+        # else:
+        #     # Determine optimal autocast dtype
+        #     autocast_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        #     with torch.no_grad():
+        #         with torch.autocast(device_type=image.device.type, dtype=autocast_dtype):
+        #             return self.model(
+        #                 image, extrinsics, intrinsics, export_feat_layers, infer_gs, use_ray_pose, ref_view_strategy
+        #             )
 
     def inference(
         self,
@@ -379,13 +405,15 @@ class DepthAnything3(nn.Module, PyTorchModelHubMixin):
         need_sync = device.type == "cuda"
         if need_sync:
             torch.cuda.synchronize(device)
-        start_time = time.time()
+        if not torch.compiler.is_compiling():
+            start_time = time.time()
         feat_layers = list(export_feat_layers) if export_feat_layers is not None else None
         output = self.forward(imgs, ex_t, in_t, feat_layers, infer_gs, use_ray_pose, ref_view_strategy)
         if need_sync:
             torch.cuda.synchronize(device)
-        end_time = time.time()
-        logger.info(f"Model Forward Pass Done. Time: {end_time - start_time} seconds")
+        if not torch.compiler.is_compiling():
+            end_time = time.time()
+            logger.info(f"Model Forward Pass Done. Time: {end_time - start_time} seconds")
         return output
 
     def _convert_to_prediction(self, raw_output: dict[str, torch.Tensor]) -> Prediction:

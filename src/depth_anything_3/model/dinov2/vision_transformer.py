@@ -361,7 +361,8 @@ class DinoVisionTransformer(nn.Module):
         else:
             raise ValueError(f"Invalid attention type: {attn_type}")
 
-        x = block(x, pos=pos, attn_mask=attn_mask)
+        x = block(x, pos, attn_mask)
+#        x = block(x, pos=pos, attn_mask=attn_mask)
 
         if attn_type == "local":
             x = rearrange(x, "(b s) n c -> b s n c", b=b, s=s)

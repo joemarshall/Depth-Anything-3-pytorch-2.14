@@ -16,7 +16,6 @@
 from typing import List, Sequence, Tuple
 import torch
 import torch.nn as nn
-from addict import Dict
 
 from depth_anything_3.model.dpt import _make_fusion_block, _make_scratch
 from depth_anything_3.model.utils.head_utils import (
@@ -160,7 +159,7 @@ class DualDPT(nn.Module):
         W: int,
         patch_start_idx: int,
         chunk_size: int = 8,
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """
         Args:
             aggregated_tokens_list: List of 4 tensors [B, S, T, C] from transformer.
@@ -169,7 +168,7 @@ class DualDPT(nn.Module):
             frames_chunk_size:     Optional chunking along S for memory.
 
         Returns:
-            Dict[str, Tensor] with keys based on `head_names`, e.g.:
+            dict[str, Tensor] with keys based on `head_names`, e.g.:
                 self.head_main, f"{self.head_main}_conf",
                 self.head_aux,  f"{self.head_aux}_conf"
             Shapes:
@@ -183,7 +182,7 @@ class DualDPT(nn.Module):
         if chunk_size is None or chunk_size >= S:
             out_dict = self._forward_impl(feats, H, W, patch_start_idx)
             out_dict = {k: v.reshape(B, S, *v.shape[1:]) for k, v in out_dict.items()}
-            return Dict(out_dict)
+            return out_dict
         out_dicts = []
         for s0 in range(0, B * S, chunk_size):
             s1 = min(s0 + chunk_size, B * S)
@@ -199,7 +198,7 @@ class DualDPT(nn.Module):
             for k in out_dicts[0].keys()
         }
         out_dict = {k: v.view(B, S, *v.shape[1:]) for k, v in out_dict.items()}
-        return Dict(out_dict)
+        return out_dict
 
     # -------------------------------------------------------------------------
     # Internal forward (single chunk)
@@ -211,7 +210,7 @@ class DualDPT(nn.Module):
         H: int,
         W: int,
         patch_start_idx: int,
-    ) -> Dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor]:
         B, _, C = feats[0].shape
         ph, pw = H // self.patch_size, W // self.patch_size
         resized_feats = []

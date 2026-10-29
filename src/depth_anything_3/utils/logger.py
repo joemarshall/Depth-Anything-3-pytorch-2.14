@@ -14,7 +14,7 @@
 
 import os
 import sys
-
+import torch
 
 class Color:
     RED = "\033[91m"
@@ -39,6 +39,8 @@ class Logger:
         self.level = get_env_log_level()
 
     def log(self, level_str, *args, **kwargs):
+        if torch.compiler.is_compiling():
+            return False  # Avoid logging during TorchScript compilation
         level_key = level_str.split(":")[0].strip()
         level_val = LOG_LEVELS.get(level_key)
         if level_val is None:

@@ -17,7 +17,7 @@ from typing import Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
-from einops import einsum
+from einops import einsum,pack,rearrange
 
 
 def as_homogeneous(ext):
@@ -51,8 +51,17 @@ def as_homogeneous(ext):
         raise TypeError("Input must be a torch.Tensor or np.ndarray.")
 
 
-@torch.jit.script
 def affine_inverse(A: torch.Tensor):
+    # R_t = rearrange(A[:,:,:3,:3],"... i j -> ... j i")
+    # new_T = - einsum(-R_t, A[...,:3,3],"... i j, ... j -> ... i").unsqueeze(-1)
+    # new_P_and_1 = A[...,3:,:]
+
+    # #print(new_T.shape,R_t.shape)
+    # top_block = torch.cat([R_t, new_T], dim=-1)
+    # bottom_row = new_P_and_1
+    # inverted_affine_transform = torch.cat([top_block, bottom_row], dim=-2)
+    # return inverted_affine_transform
+    A = A.clone()
     R = A[..., :3, :3]  # ..., 3, 3
     T = A[..., :3, 3:]  # ..., 3, 1
     P = A[..., 3:, :]  # ..., 1, 4
