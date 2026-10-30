@@ -191,11 +191,15 @@ class DinoVisionTransformer(nn.Module):
         else:
             raise NotImplementedError
 
-        if self.rope_start != -1:
-            self.rope = RotaryPositionEmbedding2D(frequency=rope_freq) if rope_freq > 0 else None
-            self.position_getter = PositionGetter() if self.rope is not None else None
+        if self.rope_start != -1 and rope_freq>0:
+            self.ropes = {
+                i: RotaryPositionEmbedding2D(frequency=rope_freq)  
+                for i in range(depth) if i>=rope_start 
+            }
+            self.position_getter = PositionGetter()
         else:
-            self.rope = None
+            self.ropes = None
+            self.position_getter = None
         blocks_list = [
             block_fn(
                 dim=embed_dim,
@@ -210,7 +214,7 @@ class DinoVisionTransformer(nn.Module):
                 ffn_layer=ffn_layer,
                 init_values=init_values,
                 qk_norm=i >= qknorm_start if qknorm_start != -1 else False,
-                rope=self.rope if i >= rope_start and rope_start != -1 else None,
+                rope=self.ropes.get(i,None),
             )
             for i in range(depth)
         ]
@@ -282,7 +286,7 @@ class DinoVisionTransformer(nn.Module):
     def _prepare_rope(self, B, S, H, W, device):
         pos = None
         pos_nodiff = None
-        if self.rope is not None:
+        if self.ropes is not None:
             pos = self.position_getter(
                 B * S, H // self.patch_size, W // self.patch_size, device=device
             )
@@ -305,7 +309,7 @@ class DinoVisionTransformer(nn.Module):
         pos, pos_nodiff = self._prepare_rope(B, S, H, W, x.device)
 
         for i, blk in enumerate(self.blocks):
-            if i < self.rope_start or self.rope is None:
+            if i < self.rope_start or self.ropes is None:
                 g_pos, l_pos = None, None
             else:
                 g_pos = pos_nodiff
@@ -361,8 +365,7 @@ class DinoVisionTransformer(nn.Module):
         else:
             raise ValueError(f"Invalid attention type: {attn_type}")
 
-        x = block(x, pos, attn_mask)
-#        x = block(x, pos=pos, attn_mask=attn_mask)
+        x = block(x, pos=pos, attn_mask=attn_mask)
 
         if attn_type == "local":
             x = rearrange(x, "(b s) n c -> b s n c", b=b, s=s)

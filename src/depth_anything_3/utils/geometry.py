@@ -61,7 +61,6 @@ def affine_inverse(A: torch.Tensor):
     # bottom_row = new_P_and_1
     # inverted_affine_transform = torch.cat([top_block, bottom_row], dim=-2)
     # return inverted_affine_transform
-    A = A.clone()
     R = A[..., :3, :3]  # ..., 3, 3
     T = A[..., :3, 3:]  # ..., 3, 1
     P = A[..., 3:, :]  # ..., 1, 4
