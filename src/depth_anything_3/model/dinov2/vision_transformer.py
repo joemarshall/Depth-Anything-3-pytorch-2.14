@@ -284,6 +284,11 @@ class DinoVisionTransformer(nn.Module):
         return x
 
     def _prepare_rope(self, B, S, H, W, device):
+        embed_dim =self.pos_embed.shape[-1]
+        channels = 3
+        coord_dimensions = 4
+        feature_dim = embed_dim // (channels * coord_dimensions)
+
         pos = None
         pos_nodiff = None
         if self.ropes is not None:
@@ -299,6 +304,16 @@ class DinoVisionTransformer(nn.Module):
                 pos = torch.cat([pos_special, pos], dim=2)
                 pos_nodiff = pos_nodiff + 1
                 pos_nodiff = torch.cat([pos_special, pos_nodiff], dim=2)
+
+
+        for i, blk in enumerate(self.blocks):
+             if i in self.ropes:                
+                if self.alt_start != -1 and i >= self.alt_start and i % 2 == 1:
+                    self.ropes[i].set_frequency_max(maxdim=1,feature_dim = feature_dim,device=pos.device,dtype=pos.dtype)
+                else:
+                    self.ropes[i].set_frequency_max(maxdim=max(H//self.patch_size,W//self.patch_size),feature_dim = feature_dim,device=pos.device,dtype=pos.dtype)
+
+            
         return pos, pos_nodiff
 
     def _get_intermediate_layers_not_chunked(self, x, n=1, export_feat_layers=[], **kwargs):

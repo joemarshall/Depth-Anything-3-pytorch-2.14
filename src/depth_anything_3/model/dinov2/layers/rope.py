@@ -52,8 +52,7 @@ class PositionGetter:
             for each position in the grid, repeated for each batch item.
         """
         if torch.compiler.is_compiling():
-            print("compiline:",self.compiled_position_cache)
-            return self.compiled_position_cache.clone()
+            return self.compiled_position_cache
         if (height, width) not in self.position_cache:
             y_coords = torch.arange(height, device=device)
             x_coords = torch.arange(width, device=device)
@@ -90,6 +89,7 @@ class RotaryPositionEmbedding2D(nn.Module):
         self.scaling_factor = scaling_factor
         self.frequency_cache: Dict[Tuple, Tuple[torch.Tensor, torch.Tensor]] = {}
         self.compiled_frequency_cache: List[torch.Tensor] = [torch.tensor([], dtype=torch.float32, requires_grad=False), torch.tensor([], dtype=torch.float32, requires_grad=False)]
+        self.frequency_max = None
 
     def _compute_frequency_components(
         self, dim: int, seq_len: int, device: torch.device, dtype: torch.dtype
@@ -105,7 +105,6 @@ class RotaryPositionEmbedding2D(nn.Module):
         Returns:
             Tuple of (cosine, sine) tensors for frequency components.
         """
-        print(self.compiled_frequency_cache)
 
         cache_key = (dim, seq_len, device, dtype)
         if cache_key not in self.frequency_cache:
@@ -163,6 +162,15 @@ class RotaryPositionEmbedding2D(nn.Module):
         # Apply rotation
         return (tokens * cos) + (self._rotate_features(tokens) * sin)
 
+    def set_frequency_max(self, maxdim,feature_dim,device,dtype):
+        if self.frequency_max is not maxdim+1:
+            self.frequency_max = maxdim+1
+            cos_comp, sin_comp = self._compute_frequency_components(
+                feature_dim, self.frequency_max, device, dtype
+            )
+            self.compiled_frequency_cache[0]=cos_comp
+            self.compiled_frequency_cache[1]=sin_comp            
+
     def forward(self, tokens: torch.Tensor, positions: torch.Tensor) -> torch.Tensor:
         """Applies 2D rotary position embeddings to input tokens.
 
@@ -187,16 +195,14 @@ class RotaryPositionEmbedding2D(nn.Module):
         # Compute feature dimension for each spatial direction
         feature_dim = tokens.size(-1) // 2
 
-        # Get frequency components
-        if torch.compiler.is_compiling():
-            cos_comp, sin_comp = self.compiled_frequency_cache[0:2]
-        else:
-            max_position = int(positions.max()) + 1
-            cos_comp, sin_comp = self._compute_frequency_components(
-                feature_dim, max_position, tokens.device, tokens.dtype
-            )
-            self.compiled_frequency_cache[0]=cos_comp
-            self.compiled_frequency_cache[1]=sin_comp
+        # Frequency components should already be set up by the time we get here
+        # assert (except in compile mode)
+        if not torch.compiler.is_compiling():
+            if self.frequency_max is None:
+                self.set_frequency_max(int(positions.max()),feature_dim=feature_dim,device=tokens.device,dtype=tokens.dtype)
+                #raise ValueError("Frequency max must be set before calling forward.")
+            assert int(positions.max()) +1 == self.frequency_max
+        cos_comp, sin_comp = self.compiled_frequency_cache[0:2]
 
         # Split features for vertical and horizontal processing
         vertical_features, horizontal_features = tokens.chunk(2, dim=-1)
