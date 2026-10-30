@@ -1,3 +1,26 @@
+<h1> Depth Anything 3 - Modified for pytorch 2.14 </h1>
+
+This is a modified version of Depth Anything 3 which works on pytorch 2.14 / python 3.14. Including working efficiently with `torch.compile(fullgraph=True)` and `torch.export`. Currently it compiles for fixed image size only, due to the cache changes in rope.py. There's probably a more dynamic way to do it, but a) calculating the frequencies each time wasn't working effectively and b) getting it to even compile fully in pytorch was quite a challenge, so I've stopped here for now.
+
+<h2>Usage</h2>
+
+Before you compile, first run an eager pass of the model with the dimensions you want. This will populate the various caches in rope.py with pre-calculated positions and sin/cos arrays. Then run `torch.compile(fullgraph=True,dynamic=False)` and/or `torch.export`. 
+
+<h2> Things changed </h2>
+
+- Removed use of `addict` library, as whilst it makes lovely code, it causes graph breaks in pytorch.
+- Made various dependencies optional to save needing absolutely everything in the build
+- Fixed autocast type to bfloat16
+- Made `time.time()` calls only happen outside compilation.
+- Removed outdated `jit.script` in affine transform code.
+- Used a RotaryPositionEmbedding2D per layer (instead of just one) so that they only hold one cache for frequency values.
+- Directly use cached values in `rope.py` in compiled mode, as this avoids data dependent operations which break compile.
+
+
+
+
+
+
 <div align="center">
 <h1 style="border-bottom: none; margin-bottom: 0px ">Depth Anything 3: Recovering the Visual Space from Any Views</h1>
 <!-- <h2 style="border-top: none; margin-top: 3px;">Recovering the Visual Space from Any Views</h2> -->
