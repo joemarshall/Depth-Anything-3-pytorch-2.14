@@ -1,6 +1,6 @@
 <h1> Depth Anything 3 - Modified for pytorch 2.14 </h1>
 
-This is a modified version of Depth Anything 3 which works on pytorch 2.14 / python 3.14. Including working efficiently with `torch.compile(fullgraph=True)` and `torch.export`. Currently I've only tested for fixed image size. There's probably a more dynamic way to do it, but a) calculating the frequencies each time wasn't working effectively and b) getting it to even compile fully in pytorch was quite a challenge, so I've stopped here for now!
+This is a modified version of Depth Anything 3 which works on pytorch 2.14 / python 3.14. Including working efficiently with `torch.compile(fullgraph=True)` and `torch.export`. Currently I've only tested for fixed image size. I had to mess around with rope to make it compile without data dependencies. It might work dynamically, but getting it to even compile fully in pytorch was quite a challenge, so I've stopped here for now!
 
 <h2>Usage</h2>
 
