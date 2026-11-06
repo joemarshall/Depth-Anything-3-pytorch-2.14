@@ -309,9 +309,9 @@ class DinoVisionTransformer(nn.Module):
         for i, blk in enumerate(self.blocks):
              if i in self.ropes:                
                 if self.alt_start != -1 and i >= self.alt_start and i % 2 == 1:
-                    self.ropes[i].set_frequency_max(maxdim=1,feature_dim = feature_dim,device=pos.device,dtype=pos.dtype)
+                    self.ropes[i].set_frequency_max(maxdim=1,feature_dim = feature_dim,device=pos.device,dtype=torch.float32)
                 else:
-                    self.ropes[i].set_frequency_max(maxdim=max(H//self.patch_size,W//self.patch_size),feature_dim = feature_dim,device=pos.device,dtype=pos.dtype)
+                    self.ropes[i].set_frequency_max(maxdim=max(H//self.patch_size,W//self.patch_size),feature_dim = feature_dim,device=pos.device,dtype=torch.float32)
 
             
         return pos, pos_nodiff
